@@ -49,3 +49,8 @@ coverage/
 # Misc
 .cache/
 *.tmp
+
+# Python
+__pycache__/
+
+# Add more customized patterns as needed
