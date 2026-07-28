@@ -31,9 +31,6 @@ Thumbs.db
 *.swo
 *~
 
-# Prisma
-migrations/
-
 # Uploads
 uploads/
 *.mp3
@@ -52,5 +49,31 @@ coverage/
 
 # Python
 __pycache__/
-
+/__pycache__
 # Add more customized patterns as needed
+*.pyc
+
+# Python virtual env
+.venv/
+venv/
+env/
+
+# Packaging / build artifacts
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Jupyter (if you use notebooks for experimentation)
+.ipynb_checkpoints/
