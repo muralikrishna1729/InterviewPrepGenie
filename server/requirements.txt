@@ -1,0 +1,32 @@
+# Core
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+# DB
+sqlalchemy[asyncio]
+asyncpg
+alembic
+
+# Redis / Celery
+redis
+celery[redis]
+
+# Auth
+bcrypt
+python-jose[cryptography]
+python-multipart
+
+# AI
+groq
+elevenlabs
+langchain
+langgraph
+langchain-groq
+
+# File parsing (resume)
+pypdf
+python-docx
+
+# Websocket (FastAPI's built-in, no extra lib needed beyond uvicorn[standard])
