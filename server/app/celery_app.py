@@ -1,5 +1,6 @@
 """
-Celery app instance, broker=REDIS_URL, backend=REDIS_URL.
+Celery app instance. Broker and result backend both use Redis (same
+instance as session state; split DB indexes later if needed).
 Autodiscovers tasks in app.tasks.*
 """
 
@@ -11,7 +12,11 @@ celery_app = Celery(
     "prepgenie",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=["app.tasks.interview_tasks", "app.tasks.resume_tasks", "app.tasks.mcq_tasks"],
+    include=[
+        "app.tasks.interview_tasks",
+        "app.tasks.resume_tasks",
+        "app.tasks.mcq_tasks",
+    ],
 )
 
 celery_app.conf.update(
@@ -20,4 +25,8 @@ celery_app.conf.update(
     accept_content=["json"],
     timezone="UTC",
     enable_utc=True,
+    task_track_started=True,
+    result_expires=3600,
 )
+
+celery_app.autodiscover_tasks(["app"])
