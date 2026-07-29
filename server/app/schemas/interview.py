@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-InterviewType = Literal["Technical", "Non-Technical", "Mixed"]
+InterviewType = Literal["Technical", "Non-Technical", "Mixed", "Behavioral","Project-Based","Hr"]
 ExperienceLevel = Literal["Entry", "Mid", "Senior"]
 InterviewStatus = Literal["pending", "in_progress", "completed"]
 
@@ -17,7 +17,7 @@ class CreateInterviewRequest(BaseModel):
     interview_type: InterviewType
     tech_stack: list[str] = Field(default_factory=list)
     experience_level: ExperienceLevel
-    number_of_questions: int = Field(ge=1, le=20)
+    number_of_questions: int = Field(ge=1, le=30)
 
     @model_validator(mode="after")
     def validate_tech_stack(self) -> "CreateInterviewRequest":
