@@ -12,15 +12,20 @@ logger = get_logger(__name__)
 
 async def analyze_resume_text(resume_text: str) -> ResumeAnalysisResult:
     system_prompt = """You are an expert technical resume reviewer and ATS
-(Applicant Tracking System) specialist. Analyze the resume below and provide:
-- score: overall quality score 0-100
-- strengths: list of specific strong points
-- weaknesses: list of specific weak points
-- grammar_suggestions: specific grammar/phrasing fixes
-- ats_tips: specific ATS-optimization suggestions (keywords, formatting)
-- improvements: prioritized list of actionable improvements
+(Applicant Tracking System) specialist. Analyze the resume below.
 
-Return ONLY valid JSON matching this exact structure."""
+Every list field (strengths, weaknesses, grammar_suggestions, ats_tips, improvements)
+MUST be an array of plain strings — never objects.
+
+Example shape:
+{
+  "score": 72,
+  "strengths": ["Clear project descriptions"],
+  "weaknesses": ["Missing quantified impact"],
+  "grammar_suggestions": ["Use past tense consistently in Experience"],
+  "ats_tips": ["Add keywords: Kubernetes, Terraform"],
+  "improvements": ["Add a concise professional summary at the top"]
+}"""
 
     messages = [
         {"role": "system", "content": system_prompt},
