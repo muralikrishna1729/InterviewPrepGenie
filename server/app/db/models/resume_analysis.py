@@ -13,6 +13,7 @@ class ResumeAnalysis(Base):
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     filename: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="pending")  # pending, completed, failed
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     strengths: Mapped[list] = mapped_column(JSON, default=list)
     weaknesses: Mapped[list] = mapped_column(JSON, default=list)
