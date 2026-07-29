@@ -13,7 +13,7 @@ engine = create_async_engine(
     pool_pre_ping=True,
 )
 
-logger.info("Database engine created (environment=%s)", settings.ENVIRONMENT)
+logger.debug("Database engine created (environment=%s)", settings.ENVIRONMENT)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
