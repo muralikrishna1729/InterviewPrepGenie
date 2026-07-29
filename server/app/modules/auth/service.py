@@ -5,9 +5,12 @@ create_user, authenticate_user, get_user_by_email -- business logic, DB calls.
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.models import User
 from app.schemas.auth import LoginRequest, SignupRequest
+
+logger = get_logger(__name__)
 
 
 class AuthError(Exception):
@@ -22,6 +25,7 @@ async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
 async def create_user(db: AsyncSession, data: SignupRequest) -> tuple[User, str]:
     existing = await get_user_by_email(db, data.email)
     if existing is not None:
+        logger.warning("Signup rejected: email already registered (%s)", data.email)
         raise AuthError("Email already registered")
 
     user = User(
@@ -32,6 +36,7 @@ async def create_user(db: AsyncSession, data: SignupRequest) -> tuple[User, str]
     db.add(user)
     await db.commit()
     await db.refresh(user)
+    logger.info("User created: user_id=%s, email=%s", user.id, user.email)
 
     token = create_access_token(user.id)
     return user, token
@@ -40,9 +45,8 @@ async def create_user(db: AsyncSession, data: SignupRequest) -> tuple[User, str]
 async def authenticate_user(db: AsyncSession, data: LoginRequest) -> tuple[User, str]:
     user = await get_user_by_email(db, data.email)
 
-    # user.password_hash can be None for future OAuth-only accounts --
-    # guard here so login fails cleanly instead of crashing verify_password(pw, None)
     if user is None or user.password_hash is None or not verify_password(data.password, user.password_hash):
+        logger.warning("Authentication failed: email=%s", data.email)
         raise AuthError("Invalid email or password")
 
     token = create_access_token(user.id)

@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:5173"
     PORT: int = 5000
     ENVIRONMENT: str = "development"
+    LOG_LEVEL: str | None = None  # defaults: DEBUG in dev, INFO in prod
 
 
 settings = Settings()

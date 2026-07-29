@@ -2,18 +2,31 @@
 FastAPI app entrypoint.
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.core.logging import get_logger
 from app.modules.auth.router import router as auth_router
 from app.modules.interview.router import router as interview_router
 
-app = FastAPI(title="PrepGenie API")
+logger = get_logger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Application starting (environment=%s)", settings.ENVIRONMENT)
+    yield
+    logger.info("Application shutting down")
+
+
+app = FastAPI(title="InterviewPrepGenie API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=["*"] # lets update once frontend is ready,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
