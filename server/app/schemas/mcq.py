@@ -6,7 +6,7 @@ critical, since this is exactly the exposure this design must prevent.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices
 
 
 class McqGenerateRequest(BaseModel):
@@ -17,10 +17,14 @@ class McqGenerateRequest(BaseModel):
 class McqQuestion(BaseModel):
     """Internal shape, stored in DB JSON column. Includes the answer key."""
 
-    question_text: str
+    question_text: str = Field(
+        validation_alias=AliasChoices("question_text", "question", "text")
+    )
     options: list[str] = Field(min_length=4, max_length=4)
     correct_index: int = Field(ge=0, le=3)
     category: str  # "aptitude" | "job_specific"
+
+    model_config = {"populate_by_name": True}
 
 
 class McqQuestionForClient(BaseModel):
