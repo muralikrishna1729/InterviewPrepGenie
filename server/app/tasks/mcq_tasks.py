@@ -23,13 +23,13 @@ def generate_mcq_task(
 async def _generate_mcq_async(
     mcq_session_id: str, job_title: str | None, job_description: str
 ) -> None:
-    from app.db.base import AsyncSessionLocal
+    from app.db.base import celery_session
     from app.db.models import McqSession
     from app.modules.ai.chains.mcq_gen import generate_mcq_questions
 
     logger.info("MCQ generate task started: id=%s", mcq_session_id)
 
-    async with AsyncSessionLocal() as db:
+    async with celery_session() as db:
         mcq_session = await db.get(McqSession, mcq_session_id)
         if mcq_session is None:
             logger.error("McqSession %s not found", mcq_session_id)
@@ -39,9 +39,16 @@ async def _generate_mcq_async(
             questions = await generate_mcq_questions(job_title, job_description)
             mcq_session.questions = [q.model_dump() for q in questions]
             mcq_session.status = "ready"
-            logger.info("MCQ generate task completed: id=%s count=%d", mcq_session_id, len(questions))
+            logger.info(
+                "MCQ generate task completed: id=%s count=%d",
+                mcq_session_id,
+                len(questions),
+            )
         except AIServiceError as e:
             logger.error("MCQ generation failed for %s: %s", mcq_session_id, e)
+            mcq_session.status = "failed"
+        except Exception:
+            logger.exception("MCQ generation unexpected error for %s", mcq_session_id)
             mcq_session.status = "failed"
 
         await db.commit()
@@ -53,13 +60,13 @@ def grade_and_feedback_task(mcq_session_id: str) -> None:
 
 
 async def _feedback_async(mcq_session_id: str) -> None:
-    from app.db.base import AsyncSessionLocal
+    from app.db.base import celery_session
     from app.db.models import McqSession
     from app.modules.ai.llm import MODEL_FAST, generate_completion
 
     logger.info("MCQ feedback task started: id=%s", mcq_session_id)
 
-    async with AsyncSessionLocal() as db:
+    async with celery_session() as db:
         mcq_session = await db.get(McqSession, mcq_session_id)
         if mcq_session is None:
             logger.error("McqSession %s not found for feedback", mcq_session_id)
@@ -80,6 +87,11 @@ async def _feedback_async(mcq_session_id: str) -> None:
             logger.info("MCQ feedback task completed: id=%s", mcq_session_id)
         except AIServiceError as e:
             logger.error("MCQ feedback generation failed for %s: %s", mcq_session_id, e)
+            mcq_session.feedback = (
+                "Feedback generation failed. Your score has still been recorded."
+            )
+        except Exception:
+            logger.exception("MCQ feedback unexpected error for %s", mcq_session_id)
             mcq_session.feedback = (
                 "Feedback generation failed. Your score has still been recorded."
             )
