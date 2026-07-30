@@ -21,12 +21,12 @@ def analyze_resume_task(resume_analysis_id: str, resume_text: str) -> None:
 
 
 async def _analyze_resume_async(resume_analysis_id: str, resume_text: str) -> None:
-    from app.db.base import AsyncSessionLocal
+    from app.db.base import celery_session
     from app.db.models import ResumeAnalysis
 
     logger.info("Resume task started: id=%s", resume_analysis_id)
 
-    async with AsyncSessionLocal() as db:
+    async with celery_session() as db:
         resume_analysis = await db.get(ResumeAnalysis, resume_analysis_id)
         if resume_analysis is None:
             logger.error("ResumeAnalysis %s not found, aborting task", resume_analysis_id)
@@ -48,6 +48,9 @@ async def _analyze_resume_async(resume_analysis_id: str, resume_text: str) -> No
             )
         except AIServiceError as e:
             logger.error("Resume analysis failed for %s: %s", resume_analysis_id, e)
+            resume_analysis.status = "failed"
+        except Exception:
+            logger.exception("Resume analysis unexpected error for %s", resume_analysis_id)
             resume_analysis.status = "failed"
 
         await db.commit()
