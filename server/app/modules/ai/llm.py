@@ -36,6 +36,16 @@ def _wrap_groq_error(exc: Exception) -> AIServiceError:
     return AIServiceError(_PROVIDER, str(exc), retryable=False)
 
 
+def _compact_schema_hint(response_model: type[BaseModel]) -> str:
+    """Short field list — full model_json_schema() confuses LLMs with $defs/anyOf."""
+    lines = [f"Required JSON object for {response_model.__name__}:"]
+    for name, field in response_model.model_fields.items():
+        ann = getattr(field.annotation, "__name__", str(field.annotation))
+        lines.append(f'- "{name}": {ann}')
+    lines.append("Use these exact property names. Return JSON only.")
+    return "\n".join(lines)
+
+
 async def generate_completion(
     messages: list[dict],
     model: str = MODEL_FAST,
@@ -79,13 +89,9 @@ async def generate_structured(
 ) -> BaseModel:
     """
     Calls generate_completion with JSON mode forced, parses the result into
-    response_model. Raises AIServiceError if the response fails Pydantic validation.
+    response_model. Retries once on parse/validation failure.
     """
-    schema_hint = (
-        f"\n\nRespond with a single JSON object matching this schema "
-        f"(use these exact field names):\n"
-        f"{json.dumps(response_model.model_json_schema(), indent=2)}"
-    )
+    schema_hint = "\n\n" + _compact_schema_hint(response_model)
     enriched = list(messages)
     if enriched and enriched[0].get("role") == "system":
         enriched[0] = {
@@ -95,23 +101,46 @@ async def generate_structured(
     else:
         enriched.insert(0, {"role": "system", "content": schema_hint.strip()})
 
-    raw = await generate_completion(
-        enriched,
-        model=model,
-        max_tokens=max_tokens,
-        response_format={"type": "json_object"},
-    )
-    try:
-        parsed = response_model.model_validate(json.loads(raw))
-        logger.info("groq_llm structured ok: model=%s schema=%s", model, response_model.__name__)
-        return parsed
-    except (json.JSONDecodeError, ValidationError) as exc:
-        logger.error(
-            "groq_llm structured parse failed: schema=%s error=%s raw_preview=%s",
-            response_model.__name__,
-            exc,
-            raw[:500],
+    last_error: Exception | None = None
+    for attempt in range(1, 3):
+        raw = await generate_completion(
+            enriched,
+            model=model,
+            max_tokens=max_tokens,
+            response_format={"type": "json_object"},
         )
-        raise AIServiceError(
-            _PROVIDER, f"invalid structured response: {exc}", retryable=False
-        ) from exc
+        try:
+            parsed = response_model.model_validate(json.loads(raw))
+            logger.info(
+                "groq_llm structured ok: model=%s schema=%s attempt=%d",
+                model,
+                response_model.__name__,
+                attempt,
+            )
+            return parsed
+        except (json.JSONDecodeError, ValidationError) as exc:
+            last_error = exc
+            logger.warning(
+                "groq_llm structured parse failed: schema=%s attempt=%d error=%s raw_preview=%s",
+                response_model.__name__,
+                attempt,
+                exc,
+                raw[:500],
+            )
+            if attempt == 1:
+                enriched = list(enriched)
+                enriched.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "Your previous JSON did not match the required schema. "
+                            "Fix the property names and types, then return valid JSON only."
+                        ),
+                    }
+                )
+
+    raise AIServiceError(
+        _PROVIDER,
+        f"invalid structured response: {last_error}",
+        retryable=False,
+    ) from last_error
