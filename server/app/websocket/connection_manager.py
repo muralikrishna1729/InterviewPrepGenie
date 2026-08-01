@@ -22,20 +22,20 @@ class ConnectionManager:
             try:
                 await old_ws.close(code=4000, reason="Reconnected from another session")
             except Exception:
-                logger.debug("Failed closing old WebSocket for user_id=%s", user_id)
-            logger.info("Replacing existing WebSocket for user_id=%s", user_id)
+                logger.debug("ws_replacing_failed", user_id=user_id)
+            logger.info("ws_replacing", user_id=user_id, reason="new_connection")
 
         await websocket.accept()
         self._connections[user_id] = websocket
-        logger.info("WebSocket connected: user_id=%s active=%d", user_id, len(self._connections))
+        logger.info("ws_connected", user_id=user_id, active=len(self._connections))
 
     def disconnect(self, user_id: str) -> None:
         removed = self._connections.pop(user_id, None)
         if removed is not None:
             logger.info(
-                "WebSocket disconnected: user_id=%s active=%d",
-                user_id,
-                len(self._connections),
+                "ws_disconnected",
+                user_id=user_id,
+                active=len(self._connections),
             )
 
     async def send_json(self, user_id: str, data: dict) -> None:

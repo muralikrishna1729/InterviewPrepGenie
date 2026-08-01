@@ -9,6 +9,7 @@ immediately after transcription.
 """
 
 import base64
+import binascii
 
 from app.core.exceptions import AIServiceError
 from app.core.logging import get_logger
@@ -28,11 +29,17 @@ async def handle_start_interview(user_id: str, interview_id: str) -> None:
     from app.db.base import AsyncSessionLocal
     from app.modules.interview.service import InterviewError, get_interview_detail, update_interview_status
 
-    logger.info("Start interview: user_id=%s interview_id=%s", user_id, interview_id)
+    logger.info("interview_started", user_id=user_id, interview_id=interview_id)
 
     async with AsyncSessionLocal() as db:
         interview = await get_interview_detail(db, user_id, interview_id)
         if interview is None:
+            logger.warning(
+                "interview_start_failed",
+                user_id=user_id,
+                interview_id=interview_id,
+                error="not_found",
+            )
             await manager.send_json(
                 user_id,
                 {
@@ -75,6 +82,7 @@ async def handle_start_interview(user_id: str, interview_id: str) -> None:
         "interview_type": interview_type,
         "tech_stack": tech_stack,
         "experience_level": experience_level,
+        "difficulty": getattr(interview, "difficulty", "Medium"),
     }
     await set_interview_session(user_id, session)
     await _send_next_question(user_id, session)
@@ -90,12 +98,20 @@ async def _send_next_question(user_id: str, session: dict) -> None:
             interview_type=session["interview_type"],
             tech_stack=session["tech_stack"],
             experience_level=session["experience_level"],
+            difficulty=session.get("difficulty", "Medium"),
             previous_qa=session["previous_qa"],
             question_number=session["current_question_index"] + 1,
             total_questions=session["total_questions"],
         )
     except AIServiceError as e:
-        logger.error("Question generation failed: user_id=%s error=%s", user_id, e)
+        logger.exception(
+            "question_generation_failed",
+            user_id=user_id,
+            interview_id=session["interview_id"],
+            question_index=session["current_question_index"],
+            error=str(e),
+            retryable=e.retryable,
+        )
         await manager.send_json(
             user_id,
             {
@@ -122,11 +138,11 @@ async def _send_next_question(user_id: str, session: dict) -> None:
     await set_interview_session(user_id, session)
 
     logger.info(
-        "Question sent: user_id=%s interview_id=%s order=%d question_id=%s",
-        user_id,
-        session["interview_id"],
-        session["current_question_index"],
-        question.id,
+        "question_generation_succeeded",
+        user_id=user_id,
+        interview_id=session["interview_id"],
+        question_index=session["current_question_index"],
+        question_id=question.id,
     )
     await manager.send_json(
         user_id,
@@ -182,6 +198,17 @@ async def handle_submit_answer(user_id: str, question_id: str, audio_base64: str
     try:
         audio_bytes = base64.b64decode(audio_base64)
         transcript = await transcribe_audio(audio_bytes, filename="answer.webm")
+    except (binascii.Error, ValueError) as e:
+        logger.error("Invalid audio payload: user_id=%s error=%s", user_id, e)
+        await manager.send_json(
+            user_id,
+            {
+                "type": "error",
+                "code": "invalid_audio",
+                "message": "Received audio data was invalid or empty",
+            },
+        )
+        return
     except AIServiceError as e:
         logger.error("Transcription failed: user_id=%s error=%s", user_id, e)
         await manager.send_json(
@@ -221,10 +248,11 @@ async def handle_submit_answer(user_id: str, question_id: str, audio_base64: str
         await db.commit()
 
     logger.info(
-        "Answer saved: user_id=%s question_id=%s transcript_len=%d",
-        user_id,
-        question_id,
-        len(transcript),
+        "answer_saved",
+        user_id=user_id,
+        interview_id=session["interview_id"],
+        question_id=question_id,
+        transcript_length=len(transcript),
     )
     await manager.send_json(
         user_id,

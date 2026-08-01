@@ -10,7 +10,7 @@ logger = get_logger(__name__)
 
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=settings.ENVIRONMENT == "development",
+    echo=settings.SQL_DEBUG,  # full SQL echo only when SQL_DEBUG=true
     pool_pre_ping=True,
 )
 

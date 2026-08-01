@@ -36,7 +36,7 @@ async def create_user(db: AsyncSession, data: SignupRequest) -> tuple[User, str]
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    logger.info("User created: user_id=%s, email=%s", user.id, user.email)
+    logger.info("user_created", user_id=user.id, email=user.email)
 
     token = create_access_token(user.id)
     return user, token
@@ -46,7 +46,7 @@ async def authenticate_user(db: AsyncSession, data: LoginRequest) -> tuple[User,
     user = await get_user_by_email(db, data.email)
 
     if user is None or user.password_hash is None or not verify_password(data.password, user.password_hash):
-        logger.warning("Authentication failed: email=%s", data.email)
+        logger.warning("authentication_failed", email=data.email)
         raise AuthError("Invalid email or password")
 
     token = create_access_token(user.id)
