@@ -1,23 +1,30 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-export const useWebcam = () => {
+interface UseWebcamOptions {
+  audio?: boolean;
+}
+
+/**
+ * Adapted from _salvage/useWebcam.ts
+ * Extended to optionally capture audio alongside video (needed for interview recording).
+ */
+export const useWebcam = ({ audio = false }: UseWebcamOptions = {}) => {
   const [isActive, setIsActive] = useState(false);
-  const [hasPermission, setHasPermission] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Request webcam permission and start stream
   const startWebcam = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        audio,
       });
 
       streamRef.current = stream;
       setHasPermission(true);
+      setPermissionError(null);
       setIsActive(true);
 
       if (videoRef.current) {
@@ -25,28 +32,28 @@ export const useWebcam = () => {
       }
 
       return stream;
-    } catch (error) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Permission denied';
       console.error('Webcam permission denied:', error);
       setHasPermission(false);
+      setPermissionError(msg);
       throw error;
     }
-  }, []);
+  }, [audio]);
 
-  // Stop webcam stream
   const stopWebcam = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
-    
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    
     setIsActive(false);
   }, []);
 
-  // Cleanup on unmount
+  const getStream = useCallback(() => streamRef.current, []);
+
   useEffect(() => {
     return () => {
       stopWebcam();
@@ -56,8 +63,11 @@ export const useWebcam = () => {
   return {
     isActive,
     hasPermission,
+    permissionError,
     videoRef,
+    streamRef,
     startWebcam,
     stopWebcam,
+    getStream,
   };
 };

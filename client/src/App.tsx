@@ -1,39 +1,64 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuthStore } from './store/authStore';
-import LoginPage from './features/auth/LoginPage';
-import SignupPage from './features/auth/SignupPage';
-import DashboardPage from './features/dashboard/DashboardPage';
-import VoiceInterviewPage from './features/interview/VoiceInterviewPage';
-import ResultsPage from './features/results/ResultsPage';
-import HistoryPage from './features/history/HistoryPage';
-import ResumeAnalyzerPage from './features/resume/ResumeAnalyzerPage';
-import McqPage from './features/mcq/McqPage';
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import InterviewSetupPage from "./pages/InterviewSetupPage";
+import InterviewResultsPage from "./pages/InterviewResultsPage";
+import InterviewSession from "./appshell/pages/InterviewSession";
+import DashboardPage from "./pages/DashboardPage";
+import SettingsPage from "./pages/SettingsPage";
+import { SignupPage } from "./pages/SignupPage";
+import { ProtectedRoute } from "./layouts/ProtectedRoute";
+import { useAuthStore } from "./store/authStore";
+import AppShellLayout from "./appshell/AppLayout";
+import Dash from "./appshell/pages/Dashboard";
+import Practice from "./appshell/pages/Practice";
+import Settings from "./appshell/pages/Settings";
+import LiveInterviewSession from "./pages/LiveInterviewSession";
+import PublicLayout from "./layouts/PublicLayout";
+import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage";
 
-function App() {
+/** Public-only route guard: an authenticated user is bounced to /dashboard
+ *  instead of ever seeing the login/signup forms. */
+function PublicOnlyRoute() {
+  const token = useAuthStore((s) => s.token);
+  if (token) return <Navigate to="/dashboard" replace />;
+  return <Outlet />;
+}
+
+export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
-      <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-      <Route path="/interview/voice" element={<ProtectedRoute><VoiceInterviewPage /></ProtectedRoute>} />
-      <Route path="/results/:id" element={<ProtectedRoute><ResultsPage /></ProtectedRoute>} />
-      <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
-      <Route path="/resume" element={<ProtectedRoute><ResumeAnalyzerPage /></ProtectedRoute>} />
-      <Route path="/mcq" element={<ProtectedRoute><McqPage /></ProtectedRoute>} />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+    <div className="min-h-screen bg-bg-base text-text-primary font-sans bg-hero-mesh">
+      <Router>
+        <Routes>
+          {/* Public routes */}
+          {/* Landing page without the app-level navbar/sidebar */}
+          <Route path="/" element={<HomePage />} />
+
+          <Route element={<PublicOnlyRoute />}>
+            <Route element={<PublicLayout />}>
+              <Route path="/signup" element={<SignupPage />} />
+              <Route path="/login" element={<LoginPage />} />
+            </Route>
+          </Route>
+
+          {/* Protected app routes with layout */}
+          <Route element={<ProtectedRoute />}> 
+            <Route element={<AppShellLayout />}> 
+              <Route path="/dashboard" element={<Dash />} />
+              <Route path="/practice" element={<Practice />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/interview/:sessionId" element={<InterviewSession />} />
+              {/* Keep existing interview flows accessible under the same shell */}
+              <Route path="/practice/new" element={<InterviewSetupPage />} />
+              <Route path="/practice/session/:sessionId" element={<LiveInterviewSession />} />
+              <Route path="/practice/session/:sessionId/results" element={<InterviewResultsPage />} />
+            </Route>
+          </Route>
+
+          {/* Default redirect */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </div>
   );
 }
-
-// Protected Route Component
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = useAuthStore((state) => state.token);
-  
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return <>{children}</>;
-}
-
-export default App;
