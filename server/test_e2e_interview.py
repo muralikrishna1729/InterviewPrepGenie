@@ -80,9 +80,14 @@ async def run_e2e():
         # Step 2e: Answer Experience Level
         await ws.send(json.dumps({"type": "setup_answer", "field": "experience_level", "value": "Mid"}))
         resp = json.loads(await ws.recv())
+        print(f"Setup Question (difficulty): {resp.get('question_text')}")
+
+        # Step 2f: Answer Difficulty
+        await ws.send(json.dumps({"type": "setup_answer", "field": "difficulty", "value": "Medium"}))
+        resp = json.loads(await ws.recv())
         print(f"Setup Question (number_of_questions): {resp.get('question_text')}")
 
-        # Step 2f: Answer Number of Questions
+        # Step 2g: Answer Number of Questions
         await ws.send(json.dumps({"type": "setup_answer", "field": "number_of_questions", "value": "2"}))
         resp = json.loads(await ws.recv())
         

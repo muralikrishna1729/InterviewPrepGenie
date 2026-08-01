@@ -35,6 +35,7 @@ async def create_interview(
         tech_stack=data.tech_stack,
         experience_level=data.experience_level,
         number_of_questions=data.number_of_questions,
+        difficulty=data.difficulty,
         status="pending",
     )
     db.add(interview)

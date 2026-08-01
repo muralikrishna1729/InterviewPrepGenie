@@ -18,6 +18,7 @@ class Interview(Base):
     experience_level: Mapped[str] = mapped_column(String, nullable=False)
     number_of_questions: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String, default="pending")
+    difficulty: Mapped[str] = mapped_column(String, default="Medium")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

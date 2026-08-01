@@ -18,6 +18,16 @@ from app.websocket.session_store import (
 
 logger = get_logger(__name__)
 
+_VALID_DIFFICULTIES = {"Easy", "Medium", "Hard"}
+
+
+def _normalize_difficulty(value: str | None) -> str:
+    """Coerce a spoken/collected difficulty value to a valid enum, defaulting to Medium."""
+    if not value:
+        return "Medium"
+    title = value.strip().title()
+    return title if title in _VALID_DIFFICULTIES else "Medium"
+
 
 async def handle_start_setup(user_id: str) -> None:
     logger.info("Setup started: user_id=%s", user_id)
@@ -96,6 +106,9 @@ async def handle_setup_answer(user_id: str, field: str, value: str) -> None:
                             if t.strip()
                         ],
                         experience_level=state["collected"]["experience_level"],
+                        difficulty=_normalize_difficulty(
+                            state["collected"].get("difficulty")
+                        ),
                         number_of_questions=int(state["collected"]["number_of_questions"]),
                     ),
                 )
