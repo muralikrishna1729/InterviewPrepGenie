@@ -12,8 +12,9 @@ class FeedbackResult(BaseModel):
     strengths: list[str] = Field(..., description="Key technical/communication strengths observed")
     weaknesses: list[str] = Field(..., description="Areas where the candidate showed knowledge gaps or struggled")
     improvements: list[str] = Field(..., description="Actionable suggestions for how to improve")
+    model_answers: list[str] = Field(default_factory=list, description="One ideal model answer per question, in order")
 
-    @field_validator("strengths", "weaknesses", "improvements", mode="before")
+    @field_validator("strengths", "weaknesses", "improvements", "model_answers", mode="before")
     @classmethod
     def coerce_string_lists(cls, value: Any) -> list[str]:
         return _coerce_str_list(value)

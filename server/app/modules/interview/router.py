@@ -82,6 +82,64 @@ async def get_interview_endpoint(
     return InterviewDetailResponse.model_validate(interview)
 
 
+@router.post("/{interview_id}/model-answers", response_model=list[str])
+async def generate_model_answers_endpoint(
+    interview_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generates (and persists) model answers for an interview on demand.
+
+    Used by the results page to recover sessions whose feedback was generated
+    before model answers were reliably produced (empty model_answers). Generates
+    ALL questions in a single LLM call and writes the result back to the
+    interview's feedback row so it only needs to run once.
+    """
+    from app.modules.ai.chains.feedback_gen import _generate_model_answers
+
+    interview = await get_interview_detail(db, current_user.id, interview_id)
+    if interview is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interview not found")
+
+    qa_pairs = [
+        {
+            "question": q.question_text,
+            "answer": q.answer.transcript if q.answer else "",
+        }
+        for q in sorted(interview.questions, key=lambda q: q.order_index)
+    ]
+    if not qa_pairs:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This interview has no questions to generate model answers for.",
+        )
+
+    answers = await _generate_model_answers(
+        role=interview.role,
+        tech_stack=interview.tech_stack,
+        experience_level=interview.experience_level,
+        qa_pairs=qa_pairs,
+    )
+
+    # Persist back into the feedback row so a refresh doesn't re-generate
+    if interview.feedback is not None:
+        interview.feedback.model_answers = answers
+        await db.commit()
+        logger.info(
+            "Model answers persisted: interview_id=%s count=%d",
+            interview_id,
+            len(answers),
+        )
+    else:
+        logger.warning(
+            "No feedback row to persist model answers into: interview_id=%s",
+            interview_id,
+        )
+
+    return answers
+
+
 @router.patch("/{interview_id}/status", response_model=InterviewResponse)
 async def update_interview_status_endpoint(
     interview_id: str,
