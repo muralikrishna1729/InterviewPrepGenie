@@ -10,7 +10,7 @@ import {
   Timer,
   Bot,
   TrendingUp,
-  Infinity,
+  Infinity as InfinityIcon,
   ShieldCheck,
   UserCircle2,
 } from 'lucide-react';
@@ -21,7 +21,6 @@ import { useAuthStore } from '../store/authStore';
 const ACCENT_BG = 'bg-indigo-600';
 const ACCENT_BG_SOFT = 'bg-indigo-50';
 const ACCENT_TEXT = 'text-indigo-600';
-const ACCENT_RING = 'ring-indigo-600';
 
 export default function HomePage() {
   // FAQ state: single open at a time
@@ -76,7 +75,7 @@ export default function HomePage() {
     { icon: Timer, tag: 'New', title: 'Timed mode', desc: 'Simulate real pressure with countdown prompts and answer pacing.' },
     { icon: Bot, tag: 'AI‑Powered', title: 'Smart feedback', desc: 'Get instant notes on clarity, structure, depth, and impact after each answer.' },
     { icon: TrendingUp, tag: 'Popular', title: 'Progress tracking', desc: 'See trends over time to focus your prep and build durable habits.' },
-    { icon: Infinity, tag: 'Unlimited', title: 'Unlimited practice', desc: 'Rehearse until your stories and explanations feel effortless.' },
+    { icon: InfinityIcon, tag: 'Unlimited', title: 'Unlimited practice', desc: 'Rehearse until your stories and explanations feel effortless.' },
     { icon: ShieldCheck, tag: 'Privacy', title: 'Privacy‑first', desc: 'Your practice sessions stay private and secure while you improve.' },
   ];
 
@@ -288,7 +287,7 @@ export default function HomePage() {
             <ArrowRight className="w-5 h-5" />
           </Link>
           <p className="mt-3 text-sm text-slate-600">
-            Explore more tools: <Link to="#" className={`${ACCENT_TEXT} hover:underline`}>Resume Builder</Link> • <Link to="#" className={`${ACCENT_TEXT} hover:underline`}>Auto‑Apply</Link>
+            Explore more tools: <Link to="/resume" className={`${ACCENT_TEXT} hover:underline`}>Resume Analyzer</Link> • <Link to="/mcq" className={`${ACCENT_TEXT} hover:underline`}>MCQ Practice</Link>
           </p>
         </div>
       </section>
@@ -368,10 +367,10 @@ export default function HomePage() {
           <div>
             <div className="text-sm font-semibold text-slate-900">Tools</div>
             <ul className="mt-3 space-y-2 text-sm text-slate-600">
-              <li><Link to="#" className="hover:text-slate-900">Mock Interview</Link></li>
-              <li><Link to="#" className="hover:text-slate-900">Resume Builder</Link></li>
-              <li><Link to="#" className="hover:text-slate-900">Auto‑Apply</Link></li>
-              <li><Link to="#" className="hover:text-slate-900">Practice Sets</Link></li>
+              <li><Link to="/practice" className="hover:text-slate-900">Mock Interview</Link></li>
+              <li><Link to="/resume" className="hover:text-slate-900">Resume Analyzer</Link></li>
+              <li><Link to="/mcq" className="hover:text-slate-900">MCQ Practice</Link></li>
+              <li><Link to="/practice" className="hover:text-slate-900">Practice</Link></li>
             </ul>
           </div>
           <div>

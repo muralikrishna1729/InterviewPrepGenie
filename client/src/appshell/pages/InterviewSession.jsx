@@ -77,7 +77,7 @@ function useLiveTranscript(active) {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function SessionProgress({ current, total, elapsedMs, onEnd, containerRef, isFullscreen, onToggleFullscreen }) {
+function SessionProgress({ current, total, elapsedMs, onEnd, isFullscreen, onToggleFullscreen }) {
   const pct = Math.min(100, Math.round(((current - 1) / Math.max(total, 1)) * 100));
   const mm = Math.floor(elapsedMs / 60000).toString().padStart(2, '0');
   const ss = Math.floor((elapsedMs % 60000) / 1000).toString().padStart(2, '0');
@@ -162,25 +162,6 @@ function TranscriptStrip({ items }) {
   );
 }
 
-function CompletionCard({ onViewFeedback }) {
-  return (
-    <Card>
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-full bg-indigo-900/30 text-indigo-400 grid place-items-center">
-          <CheckCircle2 className="w-5 h-5" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-[var(--text-primary)]">Interview Complete</h2>
-          <p className="mt-1 text-[var(--text-secondary)]">Great work. We're compiling feedback and suggestions.</p>
-          <div className="mt-4">
-            <Button onClick={onViewFeedback} className="px-6 py-3">View Feedback</Button>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
 // ─── Live Transcript Panel ────────────────────────────────────────────────────
 
 function LiveTranscriptPanel({ finalText, interim, isRecording }) {
@@ -241,7 +222,6 @@ export default function InterviewSession() {
 
   const {
     currentQuestion,
-    currentTranscript,
     phase,
     setPhase,
     setupPayload,
@@ -264,7 +244,6 @@ export default function InterviewSession() {
   const { submitAnswer, endInterview, wsError, setWsError, connectionStatus } = useInterviewSession(sessionId);
 
   const [blob, setBlob] = useState(null);
-  const [blobUrl, setBlobUrl] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const submitSuccessTimerRef = useRef(null);
@@ -329,14 +308,12 @@ export default function InterviewSession() {
       // Stop live stream from main video — play the recording instead
       vid.srcObject = null;
       const url = URL.createObjectURL(blob);
-      setBlobUrl(url);
       vid.src = url;
       vid.controls = true;
       vid.muted = false;
       vid.load();
       return () => {
         URL.revokeObjectURL(url);
-        setBlobUrl(null);
       };
     } else {
       // Re-attach live stream
@@ -536,7 +513,6 @@ export default function InterviewSession() {
         total={total}
         elapsedMs={elapsedMs}
         onEnd={() => setConfirmEnd(true)}
-        containerRef={containerRef}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
       />

@@ -1,10 +1,12 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { Upload, X, Briefcase, Cog, Layers, Hash, FileText, Loader2, Gauge } from 'lucide-react';
 import { useSessionStore } from '../../store/sessionStore';
 import { interviewService } from '../../services/interview';
+import { usePersistedState } from '../../hooks/usePersistedState';
+import { useDefaultResume } from '../../hooks/useDefaultResume';
 
 const INTERVIEW_TYPES = ['Technical', 'Behavioral', 'HR', 'Mixed'];
 const EXPERIENCES = ['Fresher', '1–3 yrs', '3–5 yrs', '5+ yrs'];
@@ -38,17 +40,17 @@ const TECH_POOL = [
 export default function Practice() {
   const navigate = useNavigate();
 
-  // Form state
-  const [jobDesc, setJobDesc] = useState('');
-  const [role, setRole] = useState(ROLES[0]);
+  // Form state — persisted so fields survive navigating away and back
+  const [jobDesc, setJobDesc] = usePersistedState('practice.jobDesc', '');
+  const [role, setRole] = usePersistedState('practice.role', ROLES[0]);
   const [isCustomRole, setIsCustomRole] = useState(false);
-  const [interviewType, setInterviewType] = useState('Technical');
-  const [experience, setExperience] = useState('Fresher');
+  const [interviewType, setInterviewType] = usePersistedState('practice.interviewType', 'Technical');
+  const [experience, setExperience] = usePersistedState('practice.experience', 'Fresher');
   const [techInput, setTechInput] = useState('');
-  const [techStack, setTechStack] = useState([]);
+  const [techStack, setTechStack] = usePersistedState('practice.techStack', []);
   const [showTechPool, setShowTechPool] = useState(false);
-  const [questionCount, setQuestionCount] = useState(10);
-  const [difficulty, setDifficulty] = useState('Medium');
+  const [questionCount, setQuestionCount] = usePersistedState('practice.questionCount', 10);
+  const [difficulty, setDifficulty] = usePersistedState('practice.difficulty', 'Medium');
   const [resume, setResume] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
@@ -109,6 +111,10 @@ export default function Practice() {
   const [submitError, setSubmitError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Default resume from Settings — pre-select it so the user doesn't re-upload
+  const { defaultName } = useDefaultResume();
+  const effectiveResume = resume ?? defaultName;
+
   const handleStart = async () => {
     if (!valid) return;
     setSubmitError(null);
@@ -122,7 +128,7 @@ export default function Practice() {
       tech_stack: techStack,
       number_of_questions: questionCount,
       job_description: jobDesc,
-      resume_name: resume?.name,
+      resume_name: effectiveResume,
     };
 
     const expMap = {
@@ -212,12 +218,21 @@ export default function Practice() {
                     <span className="font-medium">{resume.name}</span>
                     <button type="button" className="text-slate-500 hover:text-red-600" onClick={() => setResume(null)}><X className="w-4 h-4"/></button>
                   </div>
+                ) : defaultName ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 font-medium">
+                      <FileText className="w-4 h-4 text-indigo-500" /> {defaultName}
+                    </span>
+                    <span className="text-xs bg-indigo-100 text-indigo-700 rounded-full px-2 py-0.5">Default resume</span>
+                  </div>
                 ) : (
                   <span>Drag & drop your resume here, or click to browse</span>
                 )}
               </div>
               <div>
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="text-sm font-medium text-indigo-600 hover:underline">Choose file</button>
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="text-sm font-medium text-indigo-600 hover:underline">
+                  {resume || defaultName ? 'Change' : 'Choose file'}
+                </button>
                 <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={onFilePick} />
               </div>
             </div>

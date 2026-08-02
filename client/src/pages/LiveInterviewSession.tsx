@@ -38,8 +38,6 @@ export default function LiveInterviewSession() {
   } = useSessionStore();
 
   const {
-    isActive: isCamActive,
-    hasPermission: hasCamPermission,
     permissionError,
     videoRef,
     streamRef,
@@ -76,12 +74,23 @@ export default function LiveInterviewSession() {
     }
   }, [currentTranscript, currentBlob, waitingForTranscript, addAttempt]);
 
+  // Replay effect
+  useEffect(() => {
+    if (isPlaying && currentBlob && playbackVideoRef.current) {
+      const url = URL.createObjectURL(currentBlob);
+      playbackVideoRef.current.src = url;
+      playbackVideoRef.current.play().catch(() => {});
+      return () => URL.revokeObjectURL(url);
+    }
+  }, [isPlaying, currentBlob]);
+
   // Handle phase completion
   useEffect(() => {
     if (phase === 'complete') {
       // Short delay for the user to see completion, then go to results
+      // (the real results route — /practice/results/:id does not exist)
       const t = setTimeout(() => {
-        navigate(`/practice/results/${sessionId}`);
+        navigate(`/practice/session/${sessionId}/results`);
       }, 1500);
       return () => clearTimeout(t);
     }
@@ -132,7 +141,7 @@ export default function LiveInterviewSession() {
                 try {
                   await startWebcam();
                   setPhase('connecting');
-                } catch (e) {
+                } catch {
                   // error is handled by the hook and shown in permissionError
                 }
               }}
@@ -186,16 +195,6 @@ export default function LiveInterviewSession() {
     if (!currentBlob) return;
     setIsPlaying(true);
   };
-
-  // Replay effect
-  useEffect(() => {
-    if (isPlaying && currentBlob && playbackVideoRef.current) {
-      const url = URL.createObjectURL(currentBlob);
-      playbackVideoRef.current.src = url;
-      playbackVideoRef.current.play().catch(() => {});
-      return () => URL.revokeObjectURL(url);
-    }
-  }, [isPlaying, currentBlob]);
 
   const handleNextQuestion = () => {
     // Send a message to get next question. 

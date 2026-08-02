@@ -3,14 +3,14 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from "react-
 import InterviewSetupPage from "./pages/InterviewSetupPage";
 import InterviewResultsPage from "./pages/InterviewResultsPage";
 import InterviewSession from "./appshell/pages/InterviewSession";
-import DashboardPage from "./pages/DashboardPage";
-import SettingsPage from "./pages/SettingsPage";
 import { SignupPage } from "./pages/SignupPage";
 import { ProtectedRoute } from "./layouts/ProtectedRoute";
 import { useAuthStore } from "./store/authStore";
 import AppShellLayout from "./appshell/AppLayout";
 import Dash from "./appshell/pages/Dashboard";
 import Practice from "./appshell/pages/Practice";
+import Mcq from "./appshell/pages/McqPage";
+import Resume from "./appshell/pages/ResumePage";
 import Settings from "./appshell/pages/Settings";
 import LiveInterviewSession from "./pages/LiveInterviewSession";
 import PublicLayout from "./layouts/PublicLayout";
@@ -42,10 +42,12 @@ export default function App() {
           </Route>
 
           {/* Protected app routes with layout */}
-          <Route element={<ProtectedRoute />}> 
-            <Route element={<AppShellLayout />}> 
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppShellLayout />}>
               <Route path="/dashboard" element={<Dash />} />
               <Route path="/practice" element={<Practice />} />
+              <Route path="/mcq" element={<Mcq />} />
+              <Route path="/resume" element={<Resume />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/interview/:sessionId" element={<InterviewSession />} />
               {/* Keep existing interview flows accessible under the same shell */}

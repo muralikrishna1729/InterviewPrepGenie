@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useWebSocket } from './useWebSocket';
 import { useSessionStore } from '../store/sessionStore';
-import type { 
-  WsMessage, 
-  WsQuestion, 
-  WsTranscript, 
-  WsInterviewComplete,
-  WsError 
+import type {
+  WsMessage,
+  WsQuestion,
+  WsTranscript,
+  WsError
 } from '../types';
 
 export const useInterviewSession = (interviewId: string) => {

@@ -37,7 +37,21 @@ async def _generate_mcq_async(
 
         try:
             questions = await generate_mcq_questions(job_title, job_description)
-            mcq_session.questions = [q.model_dump() for q in questions]
+            # De-duplicate by normalized question text — never show repeats
+            seen = set()
+            unique: list = []
+            for q in questions:
+                key = " ".join(q.question_text.lower().split())
+                if key and key not in seen:
+                    seen.add(key)
+                    unique.append(q)
+            if len(unique) < len(questions):
+                logger.warning(
+                    "MCQ dedup: %d/%d questions were duplicates and removed",
+                    len(questions) - len(unique),
+                    len(questions),
+                )
+            mcq_session.questions = [q.model_dump() for q in unique]
             mcq_session.status = "ready"
             logger.info(
                 "MCQ generate task completed: id=%s count=%d",

@@ -41,12 +41,19 @@ uploads/
 # Testing
 coverage/
 
+# Frontend reference snapshots (old client used during the rebuild; not active source)
+client_old_reference/
+client/_salvage/
+
 # Production
 *.tgz
 
 # Misc
 .cache/
 *.tmp
+
+# TypeScript build info (tsc -b emit; regenerated every build)
+*.tsbuildinfo
 
 # Python
 __pycache__/

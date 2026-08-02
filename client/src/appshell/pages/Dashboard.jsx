@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, CalendarDays, Loader2, AlertTriangle, CheckCircle2, PlayCircle, Clock } from 'lucide-react';
+import { Mic, CalendarDays, AlertTriangle, CheckCircle2, PlayCircle, Clock } from 'lucide-react';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { interviewService } from '../../services/interview';

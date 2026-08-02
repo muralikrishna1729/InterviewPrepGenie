@@ -132,25 +132,31 @@ export interface LiveSessionState {
 
 // ---------- MCQ ----------
 
+/** Question as sent to the client — answer key (correct_index) is stripped server-side. */
 export interface McqQuestion {
+  question_index: number;
   question_text: string;
   options: string[];
-  correct_index: number;
   category: string;
 }
 
 export interface McqSession {
   id: string;
-  user_id: string;
   job_title: string | null;
-  job_description: string;
-  questions: McqQuestion[] | null;
   status: 'pending' | 'ready' | 'submitted' | 'failed';
+  questions: McqQuestion[] | null;
   score: number | null;
   correct_count: number | null;
-  total: number;
+  total: number | null;
   feedback: string | null;
   created_at: string;
+}
+
+export interface McqSubmitResult {
+  score: number;
+  correct_count: number;
+  total: number;
+  feedback: string | null;
 }
 
 // ---------- Resume ----------

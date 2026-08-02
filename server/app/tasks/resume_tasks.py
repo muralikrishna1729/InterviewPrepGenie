@@ -16,11 +16,15 @@ logger = get_logger(__name__)
 
 
 @celery_app.task(name="analyze_resume_task")
-def analyze_resume_task(resume_analysis_id: str, resume_text: str) -> None:
-    asyncio.run(_analyze_resume_async(resume_analysis_id, resume_text))
+def analyze_resume_task(
+    resume_analysis_id: str, resume_text: str, job_description: str | None = None
+) -> None:
+    asyncio.run(_analyze_resume_async(resume_analysis_id, resume_text, job_description))
 
 
-async def _analyze_resume_async(resume_analysis_id: str, resume_text: str) -> None:
+async def _analyze_resume_async(
+    resume_analysis_id: str, resume_text: str, job_description: str | None = None
+) -> None:
     from app.db.base import celery_session
     from app.db.models import ResumeAnalysis
 
@@ -33,7 +37,7 @@ async def _analyze_resume_async(resume_analysis_id: str, resume_text: str) -> No
             return
 
         try:
-            result = await analyze_resume_text(resume_text)
+            result = await analyze_resume_text(resume_text, job_description)
             resume_analysis.score = result.score
             resume_analysis.strengths = result.strengths
             resume_analysis.weaknesses = result.weaknesses

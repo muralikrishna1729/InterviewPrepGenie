@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { interviewService } from "../services/interview";
+import { usePersistedState } from "../hooks/usePersistedState";
+import { useDefaultResume } from "../hooks/useDefaultResume";
 
 const interviewTypes = ["Behavioral", "Technical", "System Design", "Mixed"];
 const experienceLevels = ["Entry", "Mid", "Senior"];
@@ -26,16 +28,17 @@ export default function InterviewSetupPage() {
   const navigate = useNavigate();
 
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [role, setRole] = useState("");
-  const [interviewType, setInterviewType] = useState<string | null>(null);
-  const [jobDescription, setJobDescription] = useState("");
-  const [numQuestions, setNumQuestions] = useState(3);
-  const [experienceLevel, setExperienceLevel] = useState<string | null>(null);
-  const [difficulty, setDifficulty] = useState<string | null>(null);
-  const [selectedTech, setSelectedTech] = useState<string[]>([]);
+  const [role, setRole] = usePersistedState("setup.role", "");
+  const [interviewType, setInterviewType] = usePersistedState<string | null>("setup.interviewType", null);
+  const [jobDescription, setJobDescription] = usePersistedState("setup.jobDescription", "");
+  const [numQuestions, setNumQuestions] = usePersistedState("setup.numQuestions", 3);
+  const [experienceLevel, setExperienceLevel] = usePersistedState<string | null>("setup.experienceLevel", null);
+  const [difficulty, setDifficulty] = usePersistedState<string | null>("setup.difficulty", null);
+  const [selectedTech, setSelectedTech] = usePersistedState<string[]>("setup.selectedTech", []);
   const [customTech, setCustomTech] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { defaultName } = useDefaultResume();
 
   const handleResumeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) {
@@ -145,9 +148,17 @@ export default function InterviewSetupPage() {
               onChange={handleResumeUpload}
               className="mt-1 w-full text-sm rounded-lg border border-border p-2 bg-bg-surface text-text-primary"
             />
-            {resumeFile && (
+            {resumeFile ? (
               <p className="mt-1 text-xs text-text-primary truncate">
                 Selected: {resumeFile.name}
+              </p>
+            ) : defaultName ? (
+              <p className="mt-1 text-xs text-text-primary truncate flex items-center gap-1">
+                <span className="text-accent-mint">✓</span> Default resume: {defaultName} — choose a file above to change it
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-text-secondary">
+                Optional — set a default resume in Settings to auto-fill this.
               </p>
             )}
           </label>
