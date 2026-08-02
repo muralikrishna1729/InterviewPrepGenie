@@ -36,6 +36,64 @@ def _wrap_groq_error(exc: Exception) -> AIServiceError:
     return AIServiceError(_PROVIDER, str(exc), retryable=False)
 
 
+def _extract_json(raw: str) -> str:
+    """
+    Tolerantly extract a JSON document from an LLM reply. Groq sometimes wraps
+    the JSON in markdown code fences or pads it with prose. Returns the raw
+    string unchanged if no JSON shape is found.
+    """
+    content = raw.strip()
+
+    # Strip markdown fences: ```json ... ``` or ``` ... ```
+    if content.startswith("```"):
+        # Drop the opening fence line
+        first_newline = content.find("\n")
+        if first_newline != -1:
+            content = content[first_newline + 1 :]
+        # Drop a trailing fence if present
+        if content.rstrip().endswith("```"):
+            content = content.rstrip()[:-3].rstrip()
+
+    # If there's stray prose before/after a { ... } or [ ... ] block, take the
+    # first balanced JSON object/array.
+    for open_ch, close_ch in (("{", "}"), ("[", "]")):
+        start = content.find(open_ch)
+        if start == -1:
+            continue
+        depth = 0
+        in_str = False
+        escape = False
+        for i in range(start, len(content)):
+            c = content[i]
+            if in_str:
+                if escape:
+                    escape = False
+                elif c == "\\":
+                    escape = True
+                elif c == '"':
+                    in_str = False
+            else:
+                if c == '"':
+                    in_str = True
+                elif c == open_ch:
+                    depth += 1
+                elif c == close_ch:
+                    depth -= 1
+                    if depth == 0:
+                        return content[start : i + 1]
+    return content
+
+
+def _compact_schema_hint(response_model: type[BaseModel]) -> str:
+    """Short field list — full model_json_schema() confuses LLMs with $defs/anyOf."""
+    lines = [f"Required JSON object for {response_model.__name__}:"]
+    for name, field in response_model.model_fields.items():
+        ann = getattr(field.annotation, "__name__", str(field.annotation))
+        lines.append(f'- "{name}": {ann}')
+    lines.append("Use these exact property names. Return JSON only.")
+    return "\n".join(lines)
+
+
 async def generate_completion(
     messages: list[dict],
     model: str = MODEL_FAST,
@@ -75,19 +133,63 @@ async def generate_structured(
     messages: list[dict],
     response_model: type[BaseModel],
     model: str = MODEL_STANDARD,
+    max_tokens: int = 4096,
 ) -> BaseModel:
     """
     Calls generate_completion with JSON mode forced, parses the result into
-    response_model. Raises AIServiceError if the response fails Pydantic validation.
+    response_model. Retries once on parse/validation failure.
     """
-    raw = await generate_completion(
-        messages,
-        model=model,
-        response_format={"type": "json_object"},
-    )
-    try:
-        return response_model.model_validate(json.loads(raw))
-    except (json.JSONDecodeError, ValidationError) as exc:
-        error = AIServiceError(_PROVIDER, f"invalid structured response: {exc}", retryable=False)
-        logger.error("groq_llm failed: %s", error)
-        raise error from exc
+    schema_hint = "\n\n" + _compact_schema_hint(response_model)
+    enriched = list(messages)
+    if enriched and enriched[0].get("role") == "system":
+        enriched[0] = {
+            **enriched[0],
+            "content": (enriched[0].get("content") or "") + schema_hint,
+        }
+    else:
+        enriched.insert(0, {"role": "system", "content": schema_hint.strip()})
+
+    last_error: Exception | None = None
+    for attempt in range(1, 3):
+        raw = await generate_completion(
+            enriched,
+            model=model,
+            max_tokens=max_tokens,
+            response_format={"type": "json_object"},
+        )
+        try:
+            # Tolerate markdown fences / stray prose around the JSON
+            parsed = response_model.model_validate(json.loads(_extract_json(raw)))
+            logger.info(
+                "groq_llm structured ok: model=%s schema=%s attempt=%d",
+                model,
+                response_model.__name__,
+                attempt,
+            )
+            return parsed
+        except (json.JSONDecodeError, ValidationError) as exc:
+            last_error = exc
+            logger.warning(
+                "groq_llm structured parse failed: schema=%s attempt=%d error=%s raw_preview=%s",
+                response_model.__name__,
+                attempt,
+                exc,
+                raw[:500],
+            )
+            if attempt == 1:
+                enriched = list(enriched)
+                enriched.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "Your previous JSON did not match the required schema. "
+                            "Fix the property names and types, then return valid JSON only."
+                        ),
+                    }
+                )
+
+    raise AIServiceError(
+        _PROVIDER,
+        f"invalid structured response: {last_error}",
+        retryable=False,
+    ) from last_error

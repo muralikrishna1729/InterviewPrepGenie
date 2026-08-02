@@ -2,7 +2,7 @@
 POST /api/resume/analyze, GET /api/resume/{id}
 """
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,16 +25,18 @@ router = APIRouter(prefix="/api/resume", tags=["resume"])
 )
 async def analyze_resume(
     file: UploadFile,
+    job_description: str | None = Form(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     filename = file.filename or "upload"
     file_bytes = await file.read()
     logger.info(
-        "Resume upload: user_id=%s filename=%s size=%d",
+        "Resume upload: user_id=%s filename=%s size=%d jd_present=%s",
         current_user.id,
         filename,
         len(file_bytes),
+        bool(job_description),
     )
 
     try:
@@ -58,7 +60,7 @@ async def analyze_resume(
     await db.commit()
     await db.refresh(resume_analysis)
 
-    analyze_resume_task.delay(resume_analysis.id, extracted_text)
+    analyze_resume_task.delay(resume_analysis.id, extracted_text, job_description)
     logger.info(
         "Resume analysis queued: id=%s user_id=%s",
         resume_analysis.id,
@@ -66,6 +68,42 @@ async def analyze_resume(
     )
 
     return ResumeAnalysisResponse.model_validate(resume_analysis)
+
+
+@router.put("/default", status_code=status.HTTP_200_OK)
+async def upload_default_resume(
+    file: UploadFile,
+    current_user: User = Depends(get_current_user),
+):
+    """Set (or replace) the user's default resume. Stored on disk, no DB row."""
+    from app.modules.resume.default_resume import save_default_resume
+
+    filename = file.filename or "resume"
+    file_bytes = await file.read()
+    try:
+        stored_name = save_default_resume(current_user.id, filename, file_bytes)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return {"filename": stored_name}
+
+
+@router.get("/default")
+async def get_default_resume_endpoint(current_user: User = Depends(get_current_user)):
+    """Return metadata (filename, size) for the user's default resume, if any."""
+    from app.modules.resume.default_resume import get_default_resume
+
+    name, data = get_default_resume(current_user.id)
+    if name is None:
+        return {"filename": None}
+    return {"filename": name, "size": len(data)}
+
+
+@router.delete("/default", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_default_resume_endpoint(current_user: User = Depends(get_current_user)):
+    """Remove the user's default resume."""
+    from app.modules.resume.default_resume import delete_default_resume
+
+    delete_default_resume(current_user.id)
 
 
 @router.get("/{resume_id}", response_model=ResumeAnalysisResponse)

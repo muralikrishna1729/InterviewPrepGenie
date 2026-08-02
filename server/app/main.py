@@ -20,9 +20,10 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Application starting (environment=%s)", settings.ENVIRONMENT)
+    # DEBUG (not INFO) so uvicorn --reload restart cycles don't spam the log
+    logger.debug("application_starting environment=%s", settings.ENVIRONMENT)
     yield
-    logger.info("Application shutting down")
+    logger.debug("application_shutting_down")
 
 
 app = FastAPI(title="InterviewPrepGenie API", lifespan=lifespan)

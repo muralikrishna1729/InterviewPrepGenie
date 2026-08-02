@@ -4,6 +4,12 @@ instance as session state; split DB indexes later if needed).
 Autodiscovers tasks in app.tasks.*
 """
 
+import sys
+import asyncio
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 from celery import Celery
 
 from app.config import settings

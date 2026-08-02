@@ -15,6 +15,7 @@ class Feedback(Base):
     strengths: Mapped[list] = mapped_column(JSON, default=list)
     weaknesses: Mapped[list] = mapped_column(JSON, default=list)
     improvements: Mapped[list] = mapped_column(JSON, default=list)
+    model_answers: Mapped[list] = mapped_column(JSON, default=list)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

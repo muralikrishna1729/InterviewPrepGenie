@@ -29,5 +29,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str | None = None  # defaults: DEBUG in dev, INFO in prod
 
+    # Enable SQLAlchemy full query echo (off by default — SQL is noisy)
+    SQL_DEBUG: bool = False
+
 
 settings = Settings()

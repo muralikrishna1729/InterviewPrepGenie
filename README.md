@@ -21,7 +21,7 @@
 
 ## 📖 Overview
 
-**InterviewPrep Genie** is a full-stack application for practicing job interviews with a real-time, AI-driven voice/text interviewer. Beyond the core interview simulator, it bundles two supporting tools: an **AI resume analyzer** and an **MCQ (aptitude + role-specific) quiz generator** — giving candidates a complete self-prep loop from resume review to live mock interview to knowledge testing.
+**InterviewPrep Genie** is a full-stack application for practicing job interviews with a real-time, AI-driven text interviewer (answers captured via webcam + mic and transcribed with speech-to-text). Beyond the core interview simulator, it bundles two supporting tools: an **AI resume analyzer** and an **MCQ (aptitude + role-specific) quiz generator** — giving candidates a complete self-prep loop from resume review to live mock interview to knowledge testing.
 
 The core interview experience runs entirely over a **single authenticated WebSocket connection**, moving through a guided setup phase and an interactive question-and-answer phase, powered by an LLM (via Groq) orchestrated through **LangGraph**.
 
@@ -29,7 +29,7 @@ The core interview experience runs entirely over a **single authenticated WebSoc
 
 ## ✨ Features
 
-- 🎙️ **Live AI Voice/Text Interview** — role-specific questions generated on the fly, real-time answer capture via webcam + mic, retry/re-record support before submitting an answer
+- 🎙️ **Live AI Text Interview** — role-specific questions generated on the fly, real-time answer capture via webcam + mic (transcribed with speech-to-text), retry/re-record support before submitting an answer
 - 📄 **Resume Analyzer** — upload a PDF/DOCX resume, get an AI-scored breakdown of strengths, weaknesses, and ATS-friendliness
 - 📝 **MCQ Practice** — auto-generated aptitude + job-specific multiple-choice quiz from a pasted job description, with AI feedback on results
 - 📊 **Interview History & Feedback** — past sessions, per-interview feedback, and full transcript logs
@@ -62,7 +62,7 @@ The core interview experience runs entirely over a **single authenticated WebSoc
 flowchart TB
     subgraph Client["Frontend - React + TS + Vite"]
         UI[Practice / Interview / Dashboard / Settings UI]
-        Hooks["Hooks: useWebcam, useMicRecorder, useAudioPlayback, useWebSocket"]
+        Hooks["Hooks: useWebcam, useMediaRecorder, useWebSocket, useInterviewSession"]
     end
 
     subgraph API["FastAPI Backend"]
@@ -175,32 +175,27 @@ sequenceDiagram
 
 ```
 interview-prep-genie/
-├── frontend/
+├── client/
 │   ├── src/
-│   │   ├── features/
-│   │   │   ├── auth/
-│   │   │   ├── dashboard/
-│   │   │   ├── interview/
-│   │   │   ├── history/
-│   │   │   ├── resume/
-│   │   │   ├── mcq/
-│   │   │   └── results/
-│   │   ├── hooks/          # webcam, mic recording, audio playback, websocket
-│   │   └── App.tsx
+│   │   ├── appshell/        # routed app UI: Dashboard, Practice, MCQs, Resume, Settings, session
+│   │   ├── pages/           # auth + setup/results pages
+│   │   ├── layouts/         # ProtectedRoute, PublicLayout
+│   │   ├── hooks/           # webcam, media recorder, websocket, interview session
+│   │   ├── services/        # Axios API clients (auth, interview, mcq, resume)
+│   │   ├── store/           # Zustand (auth, session, theme)
+│   │   └── types/
 │   └── package.json
 │
-├── backend/
+├── server/
 │   ├── app/
-│   │   ├── auth/
-│   │   ├── interview/       # REST CRUD
-│   │   ├── websocket/       # setup + interview handlers
-│   │   ├── resume/
-│   │   ├── mcq/
-│   │   ├── ai/              # Groq + LangGraph service wrappers
+│   │   ├── modules/         # auth, interview, websocket, resume, mcq
+│   │   ├── ai/              # Groq + LangGraph service wrappers + chains
+│   │   ├── tasks/           # Celery tasks (feedback, resume, mcq)
+│   │   ├── db/models/       # SQLAlchemy models
 │   │   ├── celery_app.py
 │   │   └── main.py
 │   ├── alembic/             # DB migrations
-│   └── requirements.txt
+│   └── pyproject.toml       # uv-managed deps
 │
 ├── docker-compose.yml
 ├── Dockerfile
@@ -268,11 +263,13 @@ docker compose down
 
 | Module | Endpoints |
 |---|---|
-| **Auth** | `POST /auth/signup`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
-| **Interview** | `POST /interviews`, `GET /interviews`, `GET /interviews/:id`, `GET /interviews/:id/status` |
+| **Auth** | `POST /auth/signup`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/profile` |
+| **Interview** | `POST /interviews`, `GET /interviews`, `GET /interviews/:id`, `PATCH /interviews/:id/status`, `POST /interviews/:id/model-answers` |
 | **WebSocket** | `WS /ws?token=JWT` — setup + interview flow |
-| **Resume** | `POST /resume/upload`, `GET /resume/:id/result` |
-| **MCQ** | `POST /mcq/generate`, `POST /mcq/:id/submit`, `GET /mcq/:id/feedback` |
+| **Resume** | `POST /resume/analyze`, `GET /resume/:id` |
+| **MCQ** | `POST /mcq/generate`, `GET /mcq/:id`, `POST /mcq/:id/submit` |
+
+All routes are prefixed with `/api` (e.g. `POST /api/interviews`).
 
 Full interactive API docs available at `http://localhost:5000/docs` (FastAPI Swagger UI) once the backend is running.
 
@@ -286,7 +283,8 @@ User --< Interview --< Question --< Answer
               +--< Feedback
               +--< TranscriptChunk
 
-# Resume and MCQ are stateless - processed via Celery, results not persisted as separate tables
+User --< ResumeAnalysis   (persisted; Celery fills strengths/weaknesses/ats_tips)
+User --< McqSession       (persisted; Celery generates questions + feedback)
 ```
 
 ---
@@ -297,7 +295,7 @@ The parts of this project most worth being able to explain in an interview aren'
 
 ### 1. Why a single WebSocket connection instead of multiple REST calls
 The interview itself (setup → questions → answers → completion) all happens over **one** WebSocket connection (`/ws?token=JWT`), not a series of REST requests.
-- **Why:** an interview is inherently a stateful, multi-turn conversation — the next question depends on everything said before it, and the client needs to receive server-pushed content (new questions, generated audio) without polling. A single persistent connection avoids re-authenticating on every turn and avoids the latency of round-tripping through HTTP for something this chatty.
+- **Why:** an interview is inherently a stateful, multi-turn conversation — the next question depends on everything said before it, and the client needs to receive server-pushed content (new questions, transcripts) without polling. A single persistent connection avoids re-authenticating on every turn and avoids the latency of round-tripping through HTTP for something this chatty.
 - **Tradeoff:** WebSocket state is harder to horizontally scale than stateless REST — hence the Redis session store described below, so any API instance can pick up an in-flight session rather than requiring "sticky" connections to one server process.
 
 ### 2. Two-phase state machine: Setup → Interview
@@ -325,15 +323,15 @@ When an interview ends, feedback generation (an LLM call scoring the whole trans
 - **Why:** LLM calls for a full-transcript evaluation can take several seconds — blocking the WebSocket (and the user's browser tab) on that would make the "end of interview" moment feel frozen. Queuing it lets the API immediately confirm completion and the frontend can poll/subscribe for feedback readiness separately.
 - **Same pattern reused for:** resume scoring and MCQ generation/grading — anything involving an LLM call that isn't needed for the *next* immediate user action is pushed to a Celery worker.
 
-### 7. Resume Analyzer — why it's stateless/ephemeral by design
-Resume uploads are handled in-memory (multer-style upload, 5MB cap) and parsed (pdf-parse / mammoth) without ever writing the file to persistent storage or its own database table.
-- **Why:** a resume upload here is a one-off "analyze and show me results" interaction, not a record the product needs to keep querying later — so there's no schema for it, deliberately. It's processed and the result is returned; nothing lingers on disk.
-- **Known limitation (worth naming honestly in an interview):** since results aren't persisted, a user can't come back later and see a past resume analysis — that would require adding a table if the product needed history here.
+### 7. Resume Analyzer — persisted, processed asynchronously
+Resume uploads are accepted as a multipart file (PDF/DOCX, 5MB cap), parsed synchronously, and the extracted text is queued to a Celery task. The analysis record (score, strengths, weaknesses, grammar, ATS tips, improvements) is persisted to a `resume_analyses` table, and the frontend polls `GET /api/resume/:id` until it completes.
+- **Why async:** LLM scoring takes seconds, so the upload endpoint returns immediately (202) and the result is filled in by the worker — the API stays responsive.
+- **Design note:** the uploaded file bytes are not written to disk; only the extracted analysis is stored, so past analyses remain viewable by id without storing raw documents.
 
-### 8. MCQ sessions — a known, named tech-debt tradeoff
-MCQ session state currently lives in a plain in-process JS/Python `Map`/dict, not the database or even Redis.
-- **Why this is a real limitation, not an oversight:** in-memory state means sessions are lost on server restart and can't be shared across multiple API instances — it doesn't scale past a single process. This is called out explicitly in the code as a TODO ("in production, use Redis"), same pattern as the interview session store already solves.
-- **Why it's fine for now:** for a portfolio-stage project running one instance, the simplicity outweighs the cost — but it's the first thing to fix before this could run in a real multi-instance production deployment, and being able to say that unprompted is a stronger interview signal than pretending it's not there.
+### 8. MCQ sessions — persisted, with the answer key stripped client-side
+MCQ sessions are stored in a `mcq_sessions` table. Questions are generated by a Celery task; the server-side JSON keeps `correct_index` (the answer key) but the API strips it before sending to the frontend (`McqQuestionForClient`), so the key is never exposed to the client. On submit the answers are graded server-side and a follow-up Celery task produces AI feedback.
+- **Why strip the answer key:** the correct answer must never reach the browser before grading — that would make the quiz trivially gameable. The key stays in the DB JSON and is only used when grading.
+- **Tradeoff:** the current model still blocks submit until Celery finishes generating feedback, but the core grading is synchronous and immediate.
 
 ### 9. Auth: JWT + Redis blacklist (not just stateless JWT)
 Logout isn't just "delete the token client-side" — logged-out tokens are added to a **Redis blacklist** that's checked on every authenticated request/connection.
@@ -351,8 +349,10 @@ The Docker Compose config bind-mounts the whole project folder into the containe
 
 - [ ] End-to-end testing of the WebSocket interview flow against a real connection
 - [ ] Real Groq-call testing for resume upload and MCQ generation
-- [ ] Move MCQ/interview in-memory session data fully onto Redis (in progress)
+- [x] MCQ + resume persistence (Postgres-backed, answer key stripped client-side)
+- [x] Interview session state on Redis
 - [ ] Production-hardened Docker image (currently dev-mode with live reload)
+- [ ] Text-to-speech playback of questions (currently text-only; STT input works)
 
 ---
 

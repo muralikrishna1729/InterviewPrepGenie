@@ -5,8 +5,9 @@ critical, since this is exactly the exposure this design must prevent.
 """
 
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class McqGenerateRequest(BaseModel):
@@ -21,6 +22,19 @@ class McqQuestion(BaseModel):
     options: list[str] = Field(min_length=4, max_length=4)
     correct_index: int = Field(ge=0, le=3)
     category: str  # "aptitude" | "job_specific"
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_question_keys(cls, data: Any) -> Any:
+        """LLMs often emit 'question' / 'text' instead of 'question_text'."""
+        if not isinstance(data, dict):
+            return data
+        if "question_text" not in data:
+            for key in ("question", "text", "prompt", "q"):
+                if key in data:
+                    data = {**data, "question_text": data[key]}
+                    break
+        return data
 
 
 class McqQuestionForClient(BaseModel):

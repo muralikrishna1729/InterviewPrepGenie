@@ -1,81 +1,77 @@
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
-  isLoading?: boolean;
-  children: React.ReactNode;
+import React, { forwardRef, type ButtonHTMLAttributes } from 'react';
+import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
+
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Size = 'sm' | 'md' | 'lg';
+
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: Variant;
+  size?: Size;
+  loading?: boolean;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 }
 
-export default function Button({
-  variant = 'primary',
-  size = 'md',
-  isLoading = false,
-  children,
-  className = '',
-  disabled,
-  ...props
-}: ButtonProps) {
-  const base =
-    'inline-flex items-center justify-center gap-2 font-semibold tracking-tight transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0e1a] select-none cursor-pointer';
+const variantStyles: Record<Variant, string> = {
+  primary:
+    'bg-primary hover:bg-primary-hover text-white rounded-full',
+  secondary:
+    'border text-primary font-medium hover:bg-primary/10',
+  ghost:
+    'hover:bg-[var(--bg-surface-raised)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
+  danger:
+    'bg-accent-record/10 text-accent-record border border-accent-record/30 hover:bg-accent-record/20',
+};
 
-  const sizes = {
-    sm: 'px-3 py-1.5 text-xs rounded-lg',
-    md: 'px-4 py-2 text-sm rounded-[10px]',
-    lg: 'px-6 py-2.5 text-sm rounded-xl',
-  };
+const sizeStyles: Record<Size, string> = {
+  sm: 'px-3 py-1.5 text-xs gap-1.5',
+  md: 'px-4 py-2 text-sm gap-2',
+  lg: 'px-6 py-3 text-base gap-2',
+};
 
-  const variants = {
-    primary: [
-      'text-white border-0',
-      'bg-gradient-to-r from-brand-600 to-violet-600',
-      'shadow-[0_2px_12px_rgba(99,102,241,.45)]',
-      'hover:shadow-[0_4px_20px_rgba(99,102,241,.6)] hover:-translate-y-px',
-      'active:translate-y-0 active:shadow-[0_1px_6px_rgba(99,102,241,.35)]',
-    ].join(' '),
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  (
+    {
+      variant = 'primary',
+      size = 'md',
+      loading = false,
+      leftIcon,
+      rightIcon,
+      className = '',
+      children,
+      disabled,
+      ...rest
+    },
+    ref
+  ) => {
+    return (
+      <motion.button
+        ref={ref}
+        whileTap={{ scale: 0.97 }}
+        disabled={disabled || loading}
+        className={[
+          'inline-flex items-center justify-center font-medium rounded-xl',
+          'transition-all duration-200 focus-visible:outline-none',
+          'focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2',
+          'focus-visible:ring-offset-[var(--bg-base)]',
+          'disabled:opacity-50 disabled:cursor-not-allowed',
+          variantStyles[variant],
+          sizeStyles[size],
+          className,
+        ].join(' ')}
+        {...(rest as object)}
+      >
+        {loading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : leftIcon ? (
+          leftIcon
+        ) : null}
+        {children}
+        {!loading && rightIcon ? rightIcon : null}
+      </motion.button>
+    );
+  }
+);
 
-    secondary: [
-      'text-white/80 border',
-      'bg-white/5 border-white/10',
-      'hover:bg-white/10 hover:border-white/20 hover:text-white',
-      'active:bg-white/15',
-    ].join(' '),
-
-    danger: [
-      'text-white border-0',
-      'bg-gradient-to-r from-red-600 to-rose-600',
-      'shadow-[0_2px_8px_rgba(239,68,68,.35)]',
-      'hover:shadow-[0_4px_16px_rgba(239,68,68,.45)] hover:-translate-y-px',
-      'active:translate-y-0',
-    ].join(' '),
-
-    ghost: [
-      'bg-transparent border-0',
-      'hover:bg-white/8 hover:text-white',
-      'active:bg-white/12',
-    ].join(' '),
-  };
-
-  // Ghost text color via inline style since CSS var isn't Tailwind-native
-  const ghostStyle = variant === 'ghost' ? { color: 'var(--text-secondary)' } : {};
-
-  return (
-    <button
-      className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
-      style={ghostStyle}
-      disabled={disabled || isLoading}
-      {...props}
-    >
-      {isLoading ? (
-        <>
-          <svg className="animate-spin h-4 w-4 opacity-70" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <span>Loading…</span>
-        </>
-      ) : (
-        children
-      )}
-    </button>
-  );
-}
+Button.displayName = 'Button';
